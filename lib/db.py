@@ -1,32 +1,22 @@
 
 def create_customer(connection, customer_data: dict) -> int:
     """
-    Регистрирует нового клиента в таблице oc_customer.
-
+    Универсальная вставка записи в таблицу oc_customer без явного перечисления столбцов.
     :param connection: соединение с базой данных PyMySQL
-    :param customer_data: словарь с данными клиента
+    :param customer_data: словарь с данными клиента (все нужные поля)
     :return: ID созданного клиента
     """
-    query = """
-        INSERT INTO oc_customer 
-        (firstname, lastname, email, telephone, password, newsletter, status, date_added)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-    """
-    
-    params = (
-        customer_data["firstname"],
-        customer_data["lastname"],
-        customer_data["email"],
-        customer_data["telephone"],
-        customer_data["password"],  # должен быть заранее хэширован
-        customer_data.get("newsletter", 0),
-        customer_data.get("status", 1),
-    )
+    fields = ", ".join(customer_data.keys())
+    placeholders = ", ".join(["%s"] * len(customer_data))
+    values = tuple(customer_data.values())
+
+    query = f"INSERT INTO oc_customer ({fields}) VALUES ({placeholders})"
 
     with connection.cursor() as cursor:
-        cursor.execute(query, params)
+        cursor.execute(query, values)
         connection.commit()
         return cursor.lastrowid
+
     
 def get_customer_by_email(connection, email: str) -> dict | None:
     """
@@ -73,7 +63,22 @@ def delete_customer_by_id(connection, customer_id: int) -> int:
         cursor.execute(query, (customer_id,))
         connection.commit()
         return cursor.rowcount
-    
+
+def update_customer(connection, customer_id: int, updated_data: dict) -> int:
+    if not updated_data:
+        return 0
+
+    set_clause = ", ".join([f"{key} = %s" for key in updated_data])
+    values = list(updated_data.values()) + [customer_id]
+
+    query = f"UPDATE oc_customer SET {set_clause} WHERE customer_id = %s"
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, values)
+        connection.commit()
+        return cursor.rowcount
+
+
 def update_customer_status(connection, customer_id: int, status: int) -> None:
     """
     Обновляет статус клиента (например, активен = 1, отключён = 0).

@@ -2,12 +2,15 @@ import pytest
 import allure
 import random
 import string
+from datetime import datetime
+
 from lib.db import (
     create_customer,
     get_customer_by_id,
     update_customer_status,
     delete_customer_by_id,
     get_customer_by_email,
+    update_customer
 )
 
 def generate_random_string(length=6):
@@ -22,13 +25,22 @@ def generate_random_phone():
 @pytest.fixture
 def test_customer_data():
     return {
+        "customer_group_id": 1,
+        "store_id": 0,
+        "language_id": 1,
         "firstname": "Test",
         "lastname": "User",
         "email": generate_random_email(),
         "telephone": generate_random_phone(),
-        "password": "hashed_pass",  # Предполагем, что пароль уже хэширован
+        "password": "hashed_pass",  # предполагаем, что хэширование уже выполнено
+        "custom_field": "{}",       # JSON-строка, если не используется — можно оставить пустой объект
         "newsletter": 0,
+        "ip": "192.168.0.2",
         "status": 1,
+        "safe": 1,
+        "token": "AAAAABBBBBCCCCDDDD",
+        "code": "123123",
+        "date_added": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
 @allure.feature("Клиенты")
@@ -60,47 +72,28 @@ def test_update_existing_customer(connection, test_customer_data):
     }
 
     with allure.step("Обновление данных клиента"):
-        query = """
-            UPDATE oc_customer
-            SET firstname = %s, lastname = %s, email = %s, telephone = %s
-            WHERE customer_id = %s
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, (
-                updated_data["firstname"],
-                updated_data["lastname"],
-                updated_data["email"],
-                updated_data["telephone"],
-                customer_id
-            ))
-            connection.commit()
+        update_customer(connection, customer_id, updated_data)
 
     with allure.step("Проверка обновлённых данных"):
         customer = get_customer_by_id(connection, customer_id)
-        assert customer["firstname"] == updated_data["firstname"]
-        assert customer["lastname"] == updated_data["lastname"]
-        assert customer["email"] == updated_data["email"]
-        assert customer["telephone"] == updated_data["telephone"]
-
+        for key, value in updated_data.items():
+            assert customer[key] == value
 
 @allure.feature("Клиенты")
 @allure.story("Негативное обновление несуществующего клиента")
 @allure.severity(allure.severity_level.MINOR)
 def test_update_nonexistent_customer(connection):
     fake_id = 999999
-    updated_data = ("Ghost", "User", "ghost@example.com", "0000000000", fake_id)
+    updated_data = {
+        "firstname": "Ghost",
+        "lastname": "User",
+        "email": "ghost@example.com",
+        "telephone": "0000000000"
+    }
 
     with allure.step("Попытка обновить клиента с несуществующим ID"):
-        query = """
-            UPDATE oc_customer
-            SET firstname = %s, lastname = %s, email = %s, telephone = %s
-            WHERE customer_id = %s
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, updated_data)
-            connection.commit()
-            assert cursor.rowcount == 0
-
+        affected_rows = update_customer(connection, fake_id, updated_data)
+        assert affected_rows == 0
 
 @allure.feature("Клиенты")
 @allure.story("Удаление клиента")
