@@ -79,19 +79,16 @@ def update_customer(connection, customer_id: int, updated_data: dict) -> int:
         return cursor.rowcount
 
 
-def update_customer_status(connection, customer_id: int, status: int) -> None:
+def update_customer_status(connection, customer_id, new_status):
     """
-    Обновляет статус клиента (например, активен = 1, отключён = 0).
-
-    :param connection: соединение с базой данных PyMySQL
-    :param customer_id: ID клиента
-    :param status: новый статус (0 = неактивен, 1 = активен)
+    Обновляет поле status у клиента с заданным customer_id.
+    Возвращает число строк, которые были затронуты запросом.
     """
-    query = "UPDATE oc_customer SET status = %s WHERE customer_id = %s"
-
+    sql = "UPDATE oc_customer SET status = %s WHERE customer_id = %s"
     with connection.cursor() as cursor:
-        cursor.execute(query, (status, customer_id))
+        affected_rows = cursor.execute(sql, (new_status, customer_id))
         connection.commit()
+        return affected_rows
 
    
     
